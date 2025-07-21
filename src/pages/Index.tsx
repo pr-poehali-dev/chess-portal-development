@@ -2,8 +2,34 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Icon from "@/components/ui/icon"
+import ChessBoard from "@/components/ChessBoard"
+import { useState } from "react"
 
 export default function Index() {
+  const [showChessBoard, setShowChessBoard] = useState(false)
+
+  if (showChessBoard) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-yellow-50 p-4">
+        <div className="container mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <Button 
+              onClick={() => setShowChessBoard(false)}
+              variant="outline" 
+              className="mb-4"
+            >
+              <Icon name="ArrowLeft" className="mr-2 h-4 w-4" />
+              Назад на главную
+            </Button>
+            <h1 className="font-playful text-3xl text-primary">Играем в шахматы! ♔</h1>
+            <div></div>
+          </div>
+          <ChessBoard />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-yellow-50">
       {/* Header */}
@@ -44,7 +70,11 @@ export default function Index() {
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-white font-playful text-xl px-8 py-4 rounded-full transform hover:scale-105 transition-all duration-200">
+            <Button 
+              size="lg" 
+              className="bg-primary hover:bg-primary/90 text-white font-playful text-xl px-8 py-4 rounded-full transform hover:scale-105 transition-all duration-200"
+              onClick={() => setShowChessBoard(true)}
+            >
               <Icon name="Play" className="mr-2 h-6 w-6" />
               Начать играть
             </Button>
