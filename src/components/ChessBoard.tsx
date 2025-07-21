@@ -87,6 +87,109 @@ export default function ChessBoard() {
     return files[col] + ranks[row]
   }
 
+  // Проверка препятствий на пути
+  const isPathClear = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    const rowDiff = Math.abs(toRow - fromRow)
+    const colDiff = Math.abs(toCol - fromCol)
+    
+    if (rowDiff === 0 && colDiff === 0) return false
+    
+    const rowStep = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0
+    const colStep = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0
+    
+    let currentRow = fromRow + rowStep
+    let currentCol = fromCol + colStep
+    
+    while (currentRow !== toRow || currentCol !== toCol) {
+      if (board[currentRow][currentCol] !== null) {
+        return false
+      }
+      currentRow += rowStep
+      currentCol += colStep
+    }
+    
+    return true
+  }
+
+  // Валидация ходов для каждой фигуры
+  const isValidMove = (piece: ChessPiece, fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    if (!piece || !piece.type) return false
+    
+    const rowDiff = Math.abs(toRow - fromRow)
+    const colDiff = Math.abs(toCol - fromCol)
+    const rowDirection = toRow - fromRow
+    const colDirection = toCol - fromCol
+    
+    switch (piece.type) {
+      case 'pawn':
+        const direction = piece.color === 'white' ? -1 : 1
+        const startRow = piece.color === 'white' ? 6 : 1
+        
+        // Движение вперед
+        if (colDiff === 0 && board[toRow][toCol] === null) {
+          if (rowDirection === direction) return true // На одну клетку
+          if (fromRow === startRow && rowDirection === 2 * direction) return true // На две клетки с начальной позиции
+        }
+        
+        // Атака по диагонали
+        if (colDiff === 1 && rowDirection === direction && board[toRow][toCol] !== null) {
+          return board[toRow][toCol]?.color !== piece.color
+        }
+        
+        return false
+        
+      case 'rook':
+        if (rowDiff === 0 || colDiff === 0) {
+          return isPathClear(fromRow, fromCol, toRow, toCol)
+        }
+        return false
+        
+      case 'bishop':
+        if (rowDiff === colDiff && rowDiff > 0) {
+          return isPathClear(fromRow, fromCol, toRow, toCol)
+        }
+        return false
+        
+      case 'queen':
+        if ((rowDiff === 0 || colDiff === 0) || (rowDiff === colDiff && rowDiff > 0)) {
+          return isPathClear(fromRow, fromCol, toRow, toCol)
+        }
+        return false
+        
+      case 'knight':
+        return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2)
+        
+      case 'king':
+        return rowDiff <= 1 && colDiff <= 1 && (rowDiff > 0 || colDiff > 0)
+        
+      default:
+        return false
+    }
+  }
+
+  // Подсветка возможных ходов
+  const getPossibleMoves = (row: number, col: number): Position[] => {
+    const piece = board[row][col]
+    if (!piece) return []
+    
+    const possibleMoves: Position[] = []
+    
+    for (let toRow = 0; toRow < 8; toRow++) {
+      for (let toCol = 0; toCol < 8; toCol++) {
+        if (toRow === row && toCol === col) continue
+        
+        const targetPiece = board[toRow][toCol]
+        if (targetPiece && targetPiece.color === piece.color) continue
+        
+        if (isValidMove(piece, row, col, toRow, toCol)) {
+          possibleMoves.push({ row: toRow, col: toCol })
+        }
+      }
+    }
+    
+    return possibleMoves
+  }
+
   const handleSquareClick = (row: number, col: number) => {
     const clickedPiece = board[row][col]
 
@@ -106,8 +209,12 @@ export default function ChessBoard() {
       const selectedPiece = board[selectedSquare.row][selectedSquare.col]
       
       if (selectedPiece && selectedPiece.color === currentPlayer) {
-        // Проверяем, можно ли сделать ход
-        if (!clickedPiece || clickedPiece.color !== currentPlayer) {
+        // Проверяем, можно ли сделать ход (включая правила шахмат)
+        const isTargetEmpty = !clickedPiece
+        const isTargetEnemy = clickedPiece && clickedPiece.color !== currentPlayer
+        const isMoveValid = isValidMove(selectedPiece, selectedSquare.row, selectedSquare.col, row, col)
+        
+        if ((isTargetEmpty || isTargetEnemy) && isMoveValid) {
           // Делаем ход
           const newBoard = board.map(row => row.slice())
           newBoard[row][col] = selectedPiece
@@ -115,8 +222,9 @@ export default function ChessBoard() {
           
           setBoard(newBoard)
           
-          // Добавляем ход в историю
-          const moveNotation = `${getSquareName(selectedSquare.row, selectedSquare.col)}-${getSquareName(row, col)}`
+          // Добавляем ход в историю с информацией о взятии
+          const captureSymbol = clickedPiece ? 'x' : '-'
+          const moveNotation = `${getSquareName(selectedSquare.row, selectedSquare.col)}${captureSymbol}${getSquareName(row, col)}`
           setMoveHistory(prev => [...prev, moveNotation])
           
           // Меняем игрока
@@ -137,6 +245,12 @@ export default function ChessBoard() {
 
   const isSquareSelected = (row: number, col: number): boolean => {
     return selectedSquare !== null && selectedSquare.row === row && selectedSquare.col === col
+  }
+
+  const isPossibleMove = (row: number, col: number): boolean => {
+    if (!selectedSquare) return false
+    const possibleMoves = getPossibleMoves(selectedSquare.row, selectedSquare.col)
+    return possibleMoves.some(move => move.row === row && move.col === col)
   }
 
   return (
@@ -172,6 +286,10 @@ export default function ChessBoard() {
                   }
                   ${isSquareSelected(rowIndex, colIndex) 
                     ? 'ring-4 ring-primary bg-primary/20' 
+                    : ''
+                  }
+                  ${isPossibleMove(rowIndex, colIndex) 
+                    ? 'ring-2 ring-green-400 bg-green-100/50' 
                     : ''
                   }
                 `}
@@ -211,13 +329,18 @@ export default function ChessBoard() {
         </div>
         
         {/* Подсказки */}
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center space-y-2">
           <p className="text-sm text-gray-600">
             {selectedSquare 
               ? `Выбрана клетка: ${getSquareName(selectedSquare.row, selectedSquare.col)}` 
               : 'Кликните на фигуру, чтобы выбрать её'
             }
           </p>
+          {selectedSquare && (
+            <p className="text-xs text-green-600 font-semibold">
+              💡 Зелёная подсветка показывает возможные ходы
+            </p>
+          )}
         </div>
       </Card>
 
